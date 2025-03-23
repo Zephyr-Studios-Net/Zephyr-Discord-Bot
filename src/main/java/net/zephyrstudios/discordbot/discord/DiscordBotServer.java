@@ -20,8 +20,8 @@ import net.zephyrstudios.discordbot.discord.api.commands.annotation.Command;
 import net.zephyrstudios.discordbot.discord.api.commands.annotation.CommandRegister;
 import net.zephyrstudios.discordbot.discord.api.commands.annotation.Option;
 import net.zephyrstudios.discordbot.discord.api.events.EventObject;
-import net.zephyrstudios.discordbot.discord.api.events.annotation.SubscribeEvent;
 import net.zephyrstudios.discordbot.discord.api.events.annotation.EventListener;
+import net.zephyrstudios.discordbot.discord.api.events.annotation.EventListenerRegister;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.Async;
@@ -98,10 +98,10 @@ public class DiscordBotServer extends ListenerAdapter {
 		int successfulEventRegistrations = 0;
 		int failedEventRegistrations = 0;
 
-		for (Object eventObj : context.getBeansWithAnnotation(EventListener.class).values()) {
+		for (Object eventObj : context.getBeansWithAnnotation(EventListenerRegister.class).values()) {
 			for (Method method : eventObj.getClass().getMethods()) {
 				try {
-					if (method.getAnnotation(SubscribeEvent.class) == null) continue;
+					if (method.getAnnotation(EventListener.class) == null) continue;
 
 					if (method.getParameterCount() != 1)
 						throw new IllegalArgumentException(String.format("Event listener '%s' Expected 1 parameter, found %d", method.getName(), method.getParameterCount()));
