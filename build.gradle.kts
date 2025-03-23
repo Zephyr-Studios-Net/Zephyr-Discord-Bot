@@ -4,7 +4,7 @@ plugins {
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
-group = "net.zephyr-studios"
+group = "net.zephyrstudios"
 version = "0.1.0"
 
 java {
