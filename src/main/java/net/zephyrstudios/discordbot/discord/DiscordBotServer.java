@@ -5,11 +5,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.channel.Channel;
 import net.dv8tion.jda.api.events.Event;
 import net.dv8tion.jda.api.events.GenericEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.InteractionContextType;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -22,6 +25,7 @@ import net.zephyrstudios.discordbot.discord.api.commands.annotation.Option;
 import net.zephyrstudios.discordbot.discord.api.events.EventObject;
 import net.zephyrstudios.discordbot.discord.api.events.annotation.EventListener;
 import net.zephyrstudios.discordbot.discord.api.events.annotation.EventListenerRegister;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.Async;
@@ -71,14 +75,40 @@ public class DiscordBotServer extends ListenerAdapter {
 					// Registers the paramters as options for the command
 					for (Parameter parameter : commandMethod.getParameters()) {
 						Option option = parameter.getAnnotation(Option.class);
+						boolean isRequired = parameter.getType().isPrimitive() ||
+								parameter.isAnnotationPresent(Nullable.class) ||
+								parameter.isAnnotationPresent(org.springframework.lang.Nullable.class) ||
+								parameter.isAnnotationPresent(jakarta.annotation.Nullable.class) ||
+								parameter.isAnnotationPresent(io.micrometer.common.lang.Nullable.class);
+
+						OptionType type;
 
 						if (option != null) {
+							// Registeres the option based on type
 							if (parameter.getType() == String.class) {
-								OptionData optionData = new OptionData(OptionType.STRING, option.name(), option.description(), true);
-								data.addOptions(optionData);
+								type = OptionType.STRING;
+							} else if (parameter.getType() == Integer.class || parameter.getType() == int.class) {
+								type = OptionType.INTEGER;
+							} else if (parameter.getType() == Boolean.class || parameter.getType() == boolean.class) {
+								type = OptionType.BOOLEAN;
+							} else if (parameter.getType() == Float.class || parameter.getType() == float.class ||
+									parameter.getType() == Double.class || parameter.getType() == double.class ||
+									parameter.getType() == Long.class || parameter.getType() == long.class) {
+								type = OptionType.NUMBER;
+							} else if (parameter.getType() == Member.class || parameter.getType() == User.class) {
+								type = OptionType.USER;
+							} else if (parameter.getType() == Channel.class) {
+								type = OptionType.CHANNEL;
+							} else if (parameter.getType() == IMentionable.class) {
+								type = OptionType.MENTIONABLE;
+							} else if (parameter.getType() == Message.Attachment.class) {
+								type = OptionType.ATTACHMENT;
 							} else {
 								throw new IllegalArgumentException(String.format("Option of type '%s' is not supported", parameter.getType().getName()));
 							}
+
+							OptionData optionData = new OptionData(type, option.name(), option.description(), isRequired);
+							data.addOptions(optionData);
 						}
 					}
 
@@ -135,8 +165,28 @@ public class DiscordBotServer extends ListenerAdapter {
 			List<Object> parsedOptions = new ArrayList<>();
 			for (Parameter parameter : command.method().getParameters()) {
 				Option option = parameter.getAnnotation(Option.class);
-				if (option != null) {
-					parsedOptions.add(event.getOption(option.name()).getAsString());
+				OptionMapping optionMapping;
+				if (option != null && (optionMapping = event.getOption(option.name())) != null) {
+					parsedOptions.add(switch (optionMapping.getType()) {
+						case STRING -> optionMapping.getAsString();
+						case INTEGER -> optionMapping.getAsInt();
+						case BOOLEAN -> optionMapping.getAsBoolean();
+						case NUMBER -> {
+							if (parameter.getType() == Float.class || parameter.getType() == float.class) {
+								yield (float) optionMapping.getAsDouble();
+							} else if (parameter.getType() == Double.class || parameter.getType() == double.class) {
+								yield optionMapping.getAsDouble();
+							} else if (parameter.getType() == Long.class || parameter.getType() == long.class) {
+								yield optionMapping.getAsLong();
+							}
+							throw new IllegalArgumentException("There was an error parsing the number");
+						}
+						case USER -> optionMapping.getAsUser();
+						case CHANNEL -> optionMapping.getAsChannel();
+						case MENTIONABLE -> optionMapping.getAsMentionable();
+						case ATTACHMENT -> optionMapping.getAsAttachment();
+						default -> throw new IllegalArgumentException("Unsupported option type");
+					});
 					continue;
 				}
 
