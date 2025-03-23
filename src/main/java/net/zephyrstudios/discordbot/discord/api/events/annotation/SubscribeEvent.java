@@ -1,14 +1,11 @@
-package net.zephyrstudios.discordbot.discord.annotations;
-
-import org.springframework.stereotype.Component;
+package net.zephyrstudios.discordbot.discord.api.events.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.TYPE)
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-@Component
-public @interface DiscordListener {
+public @interface SubscribeEvent {
 }
